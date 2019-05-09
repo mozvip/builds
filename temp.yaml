@@ -1,0 +1,8 @@
+- name: CDisplay Ex
+  provider:
+    type: httpLink
+    versionUrl: http://www.cdisplayex.com/version
+    post:
+      url: https://www.cdisplayex.com/findit.php
+      formData: os=win64
+  postInstallCmd: ${ARTIFACT}

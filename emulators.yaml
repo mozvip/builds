@@ -1,0 +1,110 @@
+- name: dolphin
+  provider:
+    type: httpLink
+    url: https://fr.dolphin-emu.org/download/?ref=btn
+    linkSelector: a[href$="-x64.7z"]
+    versionSelector: td.version
+  location:
+    type: local
+    folder: d:\emu\dolphin-x64
+    suppressParentFolder: true
+- name: bsnes
+  provider:
+    type: httpLink
+    url: https://www.byuu.org/emulation/bsnes/
+    linkSelector: a:contains(Windows)
+    versionSelector: a:contains(Windows)
+    versionRegExp: .*v(\S+).*
+- name: rpcs3
+  provider:
+    type: appVeyor
+    name: rpcs3/rpcs3
+    branch: master
+    deploymentName: rpcs3
+  location:
+    type: local
+    folder: d:\emu\rpcs3
+- name: cxbx-reloaded develop
+  provider:
+    type: appVeyor
+    name: SoullessSentinel/cxbx-reloaded
+    branch: develop
+    jobRegExp: "Configuration: Release"
+  location:
+    type: local
+    folder: d:\emu\cxbx-reloaded
+- name: OpenMW
+  provider:
+    type: httpLink
+    url: http://www.lysator.liu.se/~ace/OpenMW/OpenMW-latest-win64.exe
+  location:
+    type: local
+    folder: d:\games\openmw
+  postInstallCmd: ${ARTIFACT} /S /D=${LOCATION}
+- name: xenia d3d12
+  provider:
+    type: appVeyor
+    name: benvanik/xenia
+    branch: d3d12
+    jobRegExp: "Configuration: Release"
+    deploymentName: xenia-d3d12.zip
+  location:
+    type: local
+    folder: d:\emu\xenia-d3d12
+- name: xenia master
+  provider:
+    type: appVeyor
+    name: benvanik/xenia
+    branch: master
+    jobRegExp: "Configuration: Release"
+    deploymentName: xenia-master.zip
+  location:
+    type: local
+    folder: d:\emu\xenia-master
+- name: Attract-Mode
+  iconUrl: http://attractmode.org/favicon.ico
+  provider:
+    type: githubRelease
+    name: mickelson/attract
+    assetNameRegExp: attract.*win64.*
+  location:
+    type: local
+    folder: d:\emu\attract-mode
+- name: ScummVM
+  provider:
+    type: httpLink
+    url: https://buildbot.scummvm.org/snapshots/master/mingw-w64-master-latest.zip
+  location:
+    type: local
+    folder: d:\emu\scummvm
+    suppressParentFolder: true
+- name: Citra Canary
+  provider:
+    type: githubRelease
+    name: citra-emu/citra-canary
+    assetNameRegExp: .*-windows-mingw-.*\.7z
+  location:
+    type: local
+    folder: d:\emu\citra-canary
+    suppressParentFolder: true
+- name: pcsx2 master
+  provider:
+    type: appVeyor
+    name: gregory38/pcsx2
+    branch: master
+    jobRegExp: .*Visual Studio 2017.*
+    deploymentName: vs2017-AppVeyor
+  location:
+    type: local
+    folder: d:\emu/pcsx2
+    suppressParentFolder: true
+- name: ppsspp
+  provider:
+    type: httpLink
+    url: https://www.ppsspp.org/downloads.html
+    linkSelector: a[href$="win.zip"]
+    versionSelector: a[href$="win.zip"]
+    versionRegExp: .*Download\s+(\S+).*
+  location:
+    type: local
+    folder: d:\emu\ppsspp

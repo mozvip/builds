@@ -1,0 +1,45 @@
+- name: cmder
+  provider:
+    type: githubRelease
+    name: cmderdev/cmder
+    assetNameRegExp: cmder\.7z
+  location:
+    type: local
+    folder: d:/apps/cmder/
+- name: Notepad ++
+  provider:
+    type: chocolatey
+    name: notepadplusplus.install
+- name: Visual Studio Code
+  provider:
+    type: chocolatey
+    name: vscode
+- name: FastStone Image Viewer
+  provider:
+    type: chocolatey
+    name: fsviewer
+- name: Calibre
+  provider:
+    type: httpLink
+    url: https://calibre-ebook.com/dist/win32
+  postInstallCmd: msiexec /a ${ARTIFACT} /qn
+- name: Alacritty
+  provider:
+    type: githubRelease
+    name: jwilm/alacritty
+    assetNameRegExp: .*\-windows\-portable\.zip
+  location:
+    type: local
+    folder: d:/apps/alacritty/
+- name: 7-zip
+  provider:
+    type: chocolatey
+    name: 7zip.install
+- name: putty
+  provider:
+    type: chocolatey
+    name: putty
+- name: fluent-terminal
+  provider:
+    type: chocolatey
+    name: fluent-terminal
