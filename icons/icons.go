@@ -40,9 +40,12 @@ func GetIconForBuild(build builds.Build) string {
 	return iconsFile
 }
 
-func downloadIcon(imageUrl string, baseURL *url.URL, iconFile string) error {
+func downloadIcon(imageUrl string, baseURL *url.URL, iconFile string) (err error) {
 	if !strings.HasPrefix(imageUrl, "http") {
-		imageUrl = files.MakeAbsoluteUrl(imageUrl, baseURL)
+		imageUrl, err = files.MakeAbsoluteUrl(imageUrl, baseURL)
+		if err != nil {
+			return err
+		}
 	}
 	localFile, downloadErr := files.DownloadFile(imageUrl, getIconsFolder())
 	if downloadErr == nil && localFile != iconFile {

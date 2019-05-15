@@ -15,9 +15,7 @@ func Chocolatey(build Provider, currentVersion *version.Version) (buildVersion v
 	// get installed version
 	commandOutput, err := exec.Command("chocolatey", "list", "--local-only", build.Name).CombinedOutput()
 	if err == nil {
-		re := regexp.MustCompile(fmt.Sprintf(".*%s\\s+([\\w\\.]+).*", build.Name))
-		submatch := re.FindStringSubmatch(string(commandOutput))
-		installedVersion = version.NewStringVersion(submatch[1])
+		installedVersion = extractVersion(build, commandOutput)
 	} else {
 		log.Println("Error invoking chocolatey", err)
 		log.Println(string(commandOutput))
@@ -26,9 +24,7 @@ func Chocolatey(build Provider, currentVersion *version.Version) (buildVersion v
 	// get available version
 	commandOutput, err = exec.Command("chocolatey", "list", build.Name).CombinedOutput()
 	if err == nil {
-		re := regexp.MustCompile(fmt.Sprintf(".*%s\\s+([\\w\\.]+).*", build.Name))
-		submatch := re.FindStringSubmatch(string(commandOutput))
-		availableVersion = version.NewStringVersion(submatch[1])
+		availableVersion = extractVersion(build, commandOutput)
 	} else {
 		log.Println("Error invoking chocolatey", err)
 		log.Println(string(commandOutput))
@@ -43,4 +39,11 @@ func Chocolatey(build Provider, currentVersion *version.Version) (buildVersion v
 	}
 
 	return availableVersion, err
+}
+
+func extractVersion(build Provider, commandOutput []byte) version.Version {
+	re := regexp.MustCompile(fmt.Sprintf(".*%s\\s+([\\w\\.]+).*", build.Name))
+	submatch := re.FindStringSubmatch(string(commandOutput))
+	v := version.NewStringVersion(submatch[1])
+	return v
 }

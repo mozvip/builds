@@ -13,20 +13,21 @@ func GitHubRelease(build Provider, currentVersion *version.Version) (remoteUrl s
 
 	split := strings.Split(build.Name, "/")
 	repositoryReleases, _, err := client.Repositories.ListReleases(context.Background(), split[0], split[1], nil)
-	if err == nil {
-		for _, release := range repositoryReleases {
-			if release.PublishedAt.After(currentVersion.DateTime) {
-				for _, asset := range release.Assets {
-					re, err := regexp.Compile(build.AssetNameRegExp)
-					if err == nil {
-						if re.MatchString(*asset.Name) {
-							return *asset.BrowserDownloadURL, version.NewDateTimeVersion(release.PublishedAt.Time), nil
-						}
+	if err != nil {
+		return remoteUrl, buildVersion, err
+	}
+	for _, release := range repositoryReleases {
+		if release.PublishedAt.After(currentVersion.DateTime) {
+			for _, asset := range release.Assets {
+				re, err := regexp.Compile(build.AssetNameRegExp)
+				if err == nil {
+					if re.MatchString(*asset.Name) {
+						return *asset.BrowserDownloadURL, version.NewDateTimeVersion(release.PublishedAt.Time), nil
 					}
 				}
 			}
 		}
 	}
 
-	return "", version.NewStringVersion(""), nil
+	return remoteUrl, buildVersion, err
 }

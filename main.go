@@ -106,7 +106,10 @@ func findIconsForBuilds(builds []builds.Build) {
 
 func main() {
 
-	localVersions := version.LoadVersions()
+	localVersions, err := version.LoadVersions()
+	if err != nil {
+		log.Fatalln("Initialization failed", err)
+	}
 	defer quit(localVersions)
 
 	from := builds.LoadBuildsFromFile("emulators.yaml")

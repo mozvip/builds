@@ -52,9 +52,12 @@ func MoveFolder(sourceFolder string, destinationFolder string) (err error) {
 	return err
 }
 
-func MakeAbsoluteUrl(relativeUrl string, requestUrl *url.URL) string {
-	uri, _ := url.Parse(relativeUrl)
-	return requestUrl.ResolveReference(uri).String()
+func MakeAbsoluteUrl(relativeUrl string, requestUrl *url.URL) (string, error) {
+	uri, err := url.Parse(strings.TrimSpace(relativeUrl))
+	if err != nil {
+		return "", err
+	}
+	return requestUrl.ResolveReference(uri).String(), nil
 }
 
 func DownloadFile(downloadUrl string, destinationFolder string) (localFile string, err error) {
@@ -66,6 +69,16 @@ func DownloadFile(downloadUrl string, destinationFolder string) (localFile strin
 	urlPath := resp.Request.URL.Path
 	i := strings.LastIndex(urlPath, "/")+1
 	filename := urlPath[i:]
+	contentDisposition := resp.Header.Get("Content-Disposition")
+	if strings.Contains(contentDisposition, "filename=") {
+		filename = contentDisposition[strings.LastIndex(contentDisposition, "=")+1:]
+		if strings.HasPrefix(filename, "\"") {
+			filename = filename[1:]
+		}
+		if strings.HasSuffix(filename, "\"") {
+			filename = filename[:len(filename)-1]
+		}
+	}
 	localFile = path.Join(destinationFolder, filename)
 
 	expectedSize, _ := strconv.ParseInt(resp.Header.Get("Content-Length"), 10, 64)

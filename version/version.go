@@ -3,8 +3,8 @@ package version
 import (
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
-	"log"
 	"os"
+	"path"
 	"time"
 )
 
@@ -46,17 +46,24 @@ func NewDateTimeVersion(dateTime time.Time) Version {
 	return v
 }
 
-func LoadVersions() map[string]Version {
+func getVersionsFile() string {
+	homeDir, _ := os.UserHomeDir()
+	versionsFile := path.Join(homeDir, ".builds", "versions.yaml")
+	return versionsFile
+}
+
+func LoadVersions() (map[string]Version, error) {
 	versions := make(map[string]Version)
 
-	_, e := os.Stat("updates.yaml")
+	versionsFile := getVersionsFile()
+
+	_, e := os.Stat(versionsFile)
 	if e != nil && os.IsNotExist(e) {
-		return versions
+		return versions, nil
 	}
-	file, err := os.Open("updates.yaml")
+	file, err := os.Open(versionsFile)
 	if err != nil {
-		log.Println("Could not read updates.yaml", err)
-		return versions
+		return versions, err
 	}
 	defer file.Close()
 
@@ -66,13 +73,13 @@ func LoadVersions() map[string]Version {
 
 	err = yaml.Unmarshal([]byte(fileData), &versions)
 
-	return versions
+	return versions, nil
 }
 
 func SaveVersions(versions map[string]Version) error {
 	out, err := yaml.Marshal(versions)
 	if err == nil {
-		err = ioutil.WriteFile("updates.yaml", out, 0644)
+		err = ioutil.WriteFile(getVersionsFile(), out, 0644)
 	}
 	return err
 }

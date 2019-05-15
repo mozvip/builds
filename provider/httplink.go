@@ -48,7 +48,10 @@ func determineLinkAndVersion(downloadUrl string, linkSelector string, versionSel
 			link, exists = selection.Attr("href")
 			if exists {
 				if !strings.HasPrefix(link, "http") {
-					link = files.MakeAbsoluteUrl(link, res.Request.URL)
+					link, err = files.MakeAbsoluteUrl(link, res.Request.URL)
+					if err != nil {
+						return "", version.Version{}, nil
+					}
 				}
 
 				if versionSelector != "" {

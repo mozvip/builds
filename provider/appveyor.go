@@ -32,35 +32,36 @@ func AppVeyor(build Provider, currentVersion *version.Version) (localFile string
 	apiUrl := fmt.Sprintf("https://ci.appveyor.com/api/projects/%s/branch/%s", build.Name, build.Branch)
 
 	resp, err := http.Get(apiUrl)
+	if err != nil {
+		return "", version.NewStringVersion(""), err
+	}
+	defer resp.Body.Close()
+	bytes, err := ioutil.ReadAll(resp.Body)
 	if err == nil {
-		defer resp.Body.Close()
-		bytes, err := ioutil.ReadAll(resp.Body)
-		if err == nil {
-			var result AppVeyorResult
-			json.Unmarshal(bytes, &result)
-			for _,job := range result.Build.Jobs {
+		var result AppVeyorResult
+		json.Unmarshal(bytes, &result)
+		for _,job := range result.Build.Jobs {
 
-				if build.JobRegExp != "" {
-					matched, _ := regexp.MatchString(build.JobRegExp, job.Name)
-					if !matched {
-						// skip this job
-						break
-					}
+			if build.JobRegExp != "" {
+				matched, _ := regexp.MatchString(build.JobRegExp, job.Name)
+				if !matched {
+					// skip this job
+					break
 				}
+			}
 
-				if job.Status == "success" && job.Finished.After(currentVersion.DateTime){
-					// get build artifacts
-					jobArtifactsUrl := fmt.Sprintf("https://ci.appveyor.com/api/buildjobs/%s/artifacts", job.JobId)
-					artifactResponse, errArtifacts := http.Get(jobArtifactsUrl)
-					if errArtifacts == nil {
-						defer artifactResponse.Body.Close()
-						bytes, _ := ioutil.ReadAll(artifactResponse.Body)
-						var artifacts []AppVeyorArtifact
-						json.Unmarshal(bytes, &artifacts)
-						for _, artifact := range artifacts {
-							if artifact.Name == build.DeploymentName || artifact.FileName == build.DeploymentName {
-								return fmt.Sprintf("https://ci.appveyor.com/api/buildjobs/%s/artifacts/%s", job.JobId, artifact.FileName), version.NewDateTimeVersion(job.Finished), nil
-							}
+			if job.Status == "success" && job.Finished.After(currentVersion.DateTime){
+				// get build artifacts
+				jobArtifactsUrl := fmt.Sprintf("https://ci.appveyor.com/api/buildjobs/%s/artifacts", job.JobId)
+				artifactResponse, errArtifacts := http.Get(jobArtifactsUrl)
+				if errArtifacts == nil {
+					defer artifactResponse.Body.Close()
+					bytes, _ := ioutil.ReadAll(artifactResponse.Body)
+					var artifacts []AppVeyorArtifact
+					json.Unmarshal(bytes, &artifacts)
+					for _, artifact := range artifacts {
+						if artifact.Name == build.DeploymentName || artifact.FileName == build.DeploymentName {
+							return fmt.Sprintf("https://ci.appveyor.com/api/buildjobs/%s/artifacts/%s", job.JobId, artifact.FileName), version.NewDateTimeVersion(job.Finished), nil
 						}
 					}
 				}
