@@ -1,6 +1,7 @@
 package version
 
 import (
+	"fmt"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os"
@@ -9,40 +10,47 @@ import (
 )
 
 type Version struct {
-	Version string
-	DateTime time.Time	`yaml:"dateTime"`
+	FloatVersion float32	`yaml:"floatVersion,omitempty"`
+	StringVersion string	`yaml:"stringVersion,omitempty"`
+	DateTime time.Time		`yaml:"dateTime,omitempty"`
 }
 
-func (v Version) After(otherVersion *Version) bool {
-
-	if otherVersion == nil {
-		return true
-	}
-
-	if v.Version != "" {
-		return v.Version > otherVersion.Version
+func (v Version) After(other *Version) bool {
+	if v.StringVersion != "" {
+		return v.StringVersion > other.StringVersion
+	} else if v.FloatVersion != 0 {
+		return v.FloatVersion > other.FloatVersion
 	} else {
-		return v.DateTime.After(otherVersion.DateTime)
+		return v.DateTime.After(other.DateTime)
 	}
 }
 
 func (v Version) String() string {
-	if v.Version != "" {
-		return v.Version
+	if v.StringVersion != "" {
+		return v.StringVersion
+	} else if v.FloatVersion != 0 {
+		return fmt.Sprintf("%f", v.FloatVersion)
 	} else {
 		return v.DateTime.String()
 	}
+
 }
 
 func NewStringVersion(version string) Version {
 	var v Version
-	v.Version = version
+	v.StringVersion = version
 	return v
 }
 
 func NewDateTimeVersion(dateTime time.Time) Version {
 	var v Version
 	v.DateTime = dateTime
+	return v
+}
+
+func NewFloatVersion(version float32) Version {
+	var v Version
+	v.FloatVersion = version
 	return v
 }
 
@@ -72,7 +80,6 @@ func LoadVersions() (map[string]Version, error) {
 	_, err = file.Read(fileData)
 
 	err = yaml.Unmarshal([]byte(fileData), &versions)
-
 	return versions, nil
 }
 

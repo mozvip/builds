@@ -55,7 +55,7 @@ func MoveFolder(sourceFolder string, destinationFolder string) (err error) {
 func MakeAbsoluteUrl(relativeUrl string, requestUrl *url.URL) (string, error) {
 	uri, err := url.Parse(strings.TrimSpace(relativeUrl))
 	if err != nil {
-		return "", err
+		return relativeUrl, err
 	}
 	return requestUrl.ResolveReference(uri).String(), nil
 }

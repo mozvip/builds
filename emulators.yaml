@@ -5,7 +5,6 @@
     linkSelector: a[href$="-x64.7z"]
     versionSelector: td.version
   location:
-    type: local
     folder: d:\emu\dolphin-x64
     suppressParentFolder: true
 - name: bsnes
@@ -15,6 +14,9 @@
     linkSelector: a:contains(Windows)
     versionSelector: a:contains(Windows)
     versionRegExp: .*v(\S+).*
+  location:
+    folder: d:\emu\bsnes
+    suppressParentFolder: true
 - name: rpcs3
   provider:
     type: appVeyor
@@ -22,7 +24,6 @@
     branch: master
     deploymentName: rpcs3
   location:
-    type: local
     folder: d:\emu\rpcs3
 - name: cxbx-reloaded develop
   provider:
@@ -31,14 +32,12 @@
     branch: develop
     jobRegExp: "Configuration: Release"
   location:
-    type: local
     folder: d:\emu\cxbx-reloaded
 - name: OpenMW
   provider:
     type: httpLink
     url: http://www.lysator.liu.se/~ace/OpenMW/OpenMW-latest-win64.exe
   location:
-    type: local
     folder: d:\games\openmw
   postInstallCmd: ${ARTIFACT} /S /D=${LOCATION}
 - name: xenia d3d12
@@ -49,7 +48,6 @@
     jobRegExp: "Configuration: Release"
     deploymentName: xenia-d3d12.zip
   location:
-    type: local
     folder: d:\emu\xenia-d3d12
 - name: xenia master
   provider:
@@ -59,7 +57,6 @@
     jobRegExp: "Configuration: Release"
     deploymentName: xenia-master.zip
   location:
-    type: local
     folder: d:\emu\xenia-master
 - name: Attract-Mode
   iconUrl: http://attractmode.org/favicon.ico
@@ -68,14 +65,12 @@
     name: mickelson/attract
     assetNameRegExp: attract.*win64.*
   location:
-    type: local
     folder: d:\emu\attract-mode
 - name: ScummVM
   provider:
     type: httpLink
     url: https://buildbot.scummvm.org/snapshots/master/mingw-w64-master-latest.zip
   location:
-    type: local
     folder: d:\emu\scummvm
     suppressParentFolder: true
 - name: Citra Canary
@@ -84,7 +79,6 @@
     name: citra-emu/citra-canary
     assetNameRegExp: .*-windows-mingw-.*\.7z
   location:
-    type: local
     folder: d:\emu\citra-canary
     suppressParentFolder: true
 - name: pcsx2 master
@@ -95,7 +89,6 @@
     jobRegExp: .*Visual Studio 2017.*
     deploymentName: vs2017-AppVeyor
   location:
-    type: local
     folder: d:\emu/pcsx2
     suppressParentFolder: true
 - name: ppsspp
@@ -106,5 +99,4 @@
     versionSelector: a[href$="win.zip"]
     versionRegExp: .*Download\s+(\S+).*
   location:
-    type: local
     folder: d:\emu\ppsspp
