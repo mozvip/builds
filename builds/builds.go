@@ -70,7 +70,7 @@ func (build Build) CheckBuild(currentVersion *version.Version) (version.Version,
 
 	if remoteUrl != "" {
 
-		if build.Location.Folder == "" {
+		if build.Location.Folder == "" && build.PostInstallCmd == "" {
 			log.Printf("%s has not location set, skipping installation", build.Name)
 		} else {
 
@@ -86,8 +86,10 @@ func (build Build) CheckBuild(currentVersion *version.Version) (version.Version,
 				if err != nil {
 					return *currentVersion, err
 				}
+				// is first entry a folder ?
 				if strings.HasPrefix(entries[0].Attr, "D") {
 					commonFolderName = entries[0].Name
+					// check if all remaining entries are in this folder
 					for _, entry := range entries[1:] {
 						if !strings.HasPrefix(entry.Name, commonFolderName) {
 							commonFolderName = ""
