@@ -14,16 +14,17 @@ import (
 )
 
 type Build struct {
-	Name string
-	Provider provider.Provider
-	Location Location
-	PostInstallCmd string	`yaml:"postInstallCmd"`
+	Name           string
+	Provider       provider.Provider
+	Location       Location
+	PostInstallCmd string `yaml:"postInstallCmd"`
 }
 
 type Location struct {
-	Type string
-	Folder string
-	SuppressParentFolder bool	`yaml:"suppressParentFolder"`
+	Type                 string
+	Folder               string
+	SuppressParentFolder bool `yaml:"suppressParentFolder"`
+	AddToPath            bool `yaml:"addToPath"`
 }
 
 func (build Build) executePostBuildCommand(localFile string) (err error) {
@@ -44,8 +45,13 @@ func (build Build) executePostBuildCommand(localFile string) (err error) {
 	return err
 }
 
-
 func (build Build) CheckBuild(currentVersion *version.Version) (version.Version, error) {
+
+	if build.Provider.Type != "chocolatey" && build.Location.Folder == "" && build.PostInstallCmd == "" {
+		log.Printf("%s has not location set, skipping installation", build.Name)
+		return *currentVersion, nil
+	}
+
 	log.Printf("Checking for new build of %s, current version = %s", build.Name, currentVersion)
 
 	var remoteUrl string
@@ -68,58 +74,83 @@ func (build Build) CheckBuild(currentVersion *version.Version) (version.Version,
 		return *currentVersion, err
 	}
 
-	if remoteUrl != "" {
+	if remoteUrl == "" {
+		return *currentVersion, err
+	}
 
-		if build.Location.Folder == "" && build.PostInstallCmd == "" {
-			log.Printf("%s has not location set, skipping installation", build.Name)
-		} else {
-
-			log.Printf("Downloading %s for new build of %s at version %s\n", remoteUrl, build.Name, newVersion)
-			localFile, err := files.DownloadFile(remoteUrl, os.TempDir())
-			if err != nil {
-				return *currentVersion, err
-			}
-			log.Printf("New build for %s was downloaded, installing from local file %s\n", build.Name, localFile)
-			if strings.HasSuffix(localFile, ".7z") || strings.HasSuffix(localFile, ".zip") {
-				entries, err := sevenzip.ReadEntries(localFile)
-				var commonFolderName string
-				if err != nil {
-					return *currentVersion, err
-				}
-				// is first entry a folder ?
-				if strings.HasPrefix(entries[0].Attr, "D") {
-					commonFolderName = entries[0].Name
-					// check if all remaining entries are in this folder
-					for _, entry := range entries[1:] {
-						if !strings.HasPrefix(entry.Name, commonFolderName) {
-							commonFolderName = ""
-							break
-						}
-					}
-				}
-				if commonFolderName != "" && build.Location.SuppressParentFolder {
-					unzipErr := sevenzip.Uncompress(localFile, os.TempDir())
-					if unzipErr == nil {
-						sourceFolder := path.Join(os.TempDir(), commonFolderName)
-						err = files.MoveFolder(sourceFolder, build.Location.Folder)
-					}
-				} else {
-					err = sevenzip.Uncompress(localFile, build.Location.Folder)
-				}
-				if err == nil {
-					os.Remove(localFile)
-				}
-			}
-			if build.PostInstallCmd != "" {
-				err = build.executePostBuildCommand(localFile)
-				if err != nil {
-					return *currentVersion, err
-				} else {
-					os.Remove(localFile)
+	log.Printf("Downloading %s for new build of %s at version %s\n", remoteUrl, build.Name, newVersion)
+	localFile, err := files.DownloadFile(remoteUrl, os.TempDir())
+	if err != nil {
+		return *currentVersion, err
+	}
+	log.Printf("New build for %s was downloaded, installing from local file %s\n", build.Name, localFile)
+	if strings.HasSuffix(localFile, ".7z") || strings.HasSuffix(localFile, ".zip") {
+		entries, err := sevenzip.ReadEntries(localFile)
+		var commonFolderName string
+		if err != nil {
+			return *currentVersion, err
+		}
+		// is first entry a folder ?
+		if strings.HasPrefix(entries[0].Attr, "D") {
+			commonFolderName = entries[0].Name
+			// check if all remaining entries are in this folder
+			for _, entry := range entries[1:] {
+				if !strings.HasPrefix(entry.Name, commonFolderName) {
+					commonFolderName = ""
+					break
 				}
 			}
 		}
 
+		// identify windows executables from archive
+		/*
+			for _, entry := range entries {
+				if strings.HasSuffix(entry.Name, ".exe") {
+
+				}
+			}
+		*/
+
+		if commonFolderName != "" && build.Location.SuppressParentFolder {
+			unzipErr := sevenzip.Uncompress(localFile, os.TempDir())
+			if unzipErr == nil {
+				sourceFolder := path.Join(os.TempDir(), commonFolderName)
+				err = files.MoveFolder(sourceFolder, build.Location.Folder)
+			}
+		} else {
+			err = sevenzip.Uncompress(localFile, build.Location.Folder)
+		}
+		if err == nil {
+			os.Remove(localFile)
+		}
+	}
+
+	if build.PostInstallCmd != "" {
+		err = build.executePostBuildCommand(localFile)
+		if err != nil {
+			return *currentVersion, err
+		} else {
+			os.Remove(localFile)
+		}
+	}
+
+	if build.Location.AddToPath {
+		path := os.Getenv("PATH")
+		paths := strings.Split(path, ";")
+		alreadyInPath := false
+		for _, value := range paths {
+			if value == build.Location.Folder {
+				alreadyInPath = true
+				break
+			}
+		}
+		if !alreadyInPath {
+			pathValue := path + ";" + build.Location.Folder
+			combinedOutputBytes, err := exec.Command("SETX", "PATH", pathValue).CombinedOutput()
+			if err != nil {
+				log.Println(string(combinedOutputBytes))
+			}
+		}
 	}
 
 	return newVersion, nil

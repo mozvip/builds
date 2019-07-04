@@ -6,7 +6,11 @@ import (
 	"github.com/mozvip/builds/icons"
 	"github.com/mozvip/builds/version"
 	"gopkg.in/toast.v1"
+	"io/ioutil"
 	"log"
+	"os"
+	"path"
+	"strings"
 	"sync"
 )
 
@@ -17,38 +21,12 @@ type CheckResult struct {
 	Err error
 }
 
-/*
-func HandleBuildResult(results chan CheckResult, versions map[string]version.Version) {
-	result := <- results
-	if result.AvailableVersion.After(&result.CurrentVersion) {
-
-		versions[result.Build.Name] = result.AvailableVersion
-
-		notification := toast.Notification{
-			AppID:   "Builds",
-			Title:   fmt.Sprintf("%s : New build version %s was installed !", result.Build.Name, result.AvailableVersion),
-			Message: fmt.Sprintf("A new build for %s was downloaded and installed...", result.Build.Name),
-			ActivationArguments: result.Build.Location.Folder,
-		}
-
-		localIconPath := icons.GetIconForBuild(result.Build)
-		if localIconPath != "" {
-			notification.Icon = localIconPath
-		}
-
-		notification.Push()
-
-		downloadCount ++
-	}
-}
-*/
 func checkBuilds(builds []builds.Build, versions map[string]version.Version) (downloadCount uint) {
 	var wg sync.WaitGroup
 	results := make(chan CheckResult, len(builds))
 	for _, build := range builds {
 		wg.Add(1)
 		go checkBuild(results, versions, build, &wg)
-		//go HandleBuildResult(results, versions)
 	}
 	wg.Wait()
 	close(results)
@@ -112,14 +90,23 @@ func main() {
 	}
 	defer quit(localVersions)
 
-	from := builds.LoadBuildsFromFile("emulators.yaml")
-	buildsFrom := builds.LoadBuildsFromFile("tools.yaml")
+	homeDir, err := os.UserHomeDir()
+	buildsDir := path.Join(homeDir, ".builds")
 
-	from = append(from, buildsFrom...)
+	infos, err := ioutil.ReadDir(buildsDir)
 
-	findIconsForBuilds(from)
+	var buildsToCheck []builds.Build
 
-	downloadCount := checkBuilds(from, localVersions)
+	for _, value := range infos {
+		if strings.HasSuffix(value.Name(), ".yaml") {
+			buildsFromFile := builds.LoadBuildsFromFile(path.Join(buildsDir, value.Name()))
+			buildsToCheck = append(buildsToCheck, buildsFromFile...)
+		}
+	}
+
+	findIconsForBuilds(buildsToCheck)
+
+	downloadCount := checkBuilds(buildsToCheck, localVersions)
 
 	if downloadCount > 0 {
 		notification := toast.Notification{

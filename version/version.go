@@ -56,7 +56,7 @@ func NewFloatVersion(version float32) Version {
 
 func getVersionsFile() string {
 	homeDir, _ := os.UserHomeDir()
-	versionsFile := path.Join(homeDir, ".builds", "versions.yaml")
+	versionsFile := path.Join(homeDir, ".builds", "versions", "versions.yaml")
 	return versionsFile
 }
 
