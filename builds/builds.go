@@ -1,10 +1,8 @@
 package builds
 
 import (
-	"github.com/mozvip/builds/provider"
 	"github.com/mozvip/builds/tools/files"
 	"github.com/mozvip/builds/tools/sevenzip"
-	"github.com/mozvip/builds/version"
 	"gopkg.in/yaml.v2"
 	"log"
 	"os"
@@ -13,9 +11,25 @@ import (
 	"strings"
 )
 
+type ProviderData struct {
+	Type string
+	Url string
+	LinkSelector string		`yaml:"linkSelector"`
+	VersionSelector string  `yaml:"versionSelector"`
+	VersionRegExp string   	`yaml:"versionRegExp"`
+	Name string
+	DeploymentName string	`yaml:"deploymentName"`
+	Branch string
+	// for githubRelease
+	AssetNameRegExp	string	`yaml:"assetNameRegExp"`
+	// for appVeyor
+	JobRegExp string		`yaml:"jobRegExp"`
+}
+
+
 type Build struct {
 	Name           string
-	Provider       provider.Provider
+	Provider       ProviderData
 	Location       Location
 	PostInstallCmd string `yaml:"postInstallCmd"`
 }
@@ -27,68 +41,18 @@ type Location struct {
 	AddToPath            bool `yaml:"addToPath"`
 }
 
-func (build Build) executePostBuildCommand(localFile string) (err error) {
-	split := strings.Split(build.PostInstallCmd, " ")
-	var commandLine []string
-	for _, string := range split {
-		string = strings.Replace(string, "${ARTIFACT}", localFile, -1)
-		if build.Location.Folder != "" {
-			string = strings.Replace(string, "${LOCATION}", localFile, -1)
-		}
-		commandLine = append(commandLine, string)
-	}
-	var combinedOutputBytes []byte
-	combinedOutputBytes, err = exec.Command(commandLine[0], commandLine[1:]...).CombinedOutput()
+func (build Build) DownloadBuildFromURL(remoteURL string) error {
+	downloadedFile, err := files.DownloadFile(remoteURL, os.TempDir())
 	if err != nil {
-		log.Println("Error occurred : ", strings.TrimSpace(string(combinedOutputBytes)), err)
+		return err
 	}
-	return err
-}
-
-func (build Build) CheckBuild(currentVersion *version.Version) (version.Version, error) {
-
-	if build.Provider.Type != "chocolatey" && build.Location.Folder == "" && build.PostInstallCmd == "" {
-		log.Printf("%s has not location set, skipping installation", build.Name)
-		return *currentVersion, nil
-	}
-
-	log.Printf("Checking for new build of %s, current version = %s", build.Name, currentVersion)
-
-	var remoteUrl string
-	var err error
-	var newVersion version.Version
-
-	switch build.Provider.Type {
-	case "httpLink":
-		remoteUrl, newVersion, err = provider.HttpLink(build.Provider, currentVersion)
-	case "appVeyor":
-		remoteUrl, newVersion, err = provider.AppVeyor(build.Provider, currentVersion)
-	case "githubRelease":
-		remoteUrl, newVersion, err = provider.GitHubRelease(build.Provider, currentVersion)
-	case "chocolatey":
-		newVersion, err = provider.Chocolatey(build.Provider, currentVersion)
-	}
-
-	if err != nil {
-		log.Printf("Error checking build for %s : %s\n", build.Name, err)
-		return *currentVersion, err
-	}
-
-	if remoteUrl == "" {
-		return *currentVersion, err
-	}
-
-	log.Printf("Downloading %s for new build of %s at version %s\n", remoteUrl, build.Name, newVersion)
-	localFile, err := files.DownloadFile(remoteUrl, os.TempDir())
-	if err != nil {
-		return *currentVersion, err
-	}
-	log.Printf("New build for %s was downloaded, installing from local file %s\n", build.Name, localFile)
-	if strings.HasSuffix(localFile, ".7z") || strings.HasSuffix(localFile, ".zip") {
-		entries, err := sevenzip.ReadEntries(localFile)
+	log.Printf("New build for %s was downloaded, installing from local file %s\n", build.Name, downloadedFile)
+	if strings.HasSuffix(downloadedFile, ".7z") || strings.HasSuffix(downloadedFile, ".zip") {
+		var entries []sevenzip.ArchiveEntry
+		entries, err = sevenzip.ReadEntries(downloadedFile)
 		var commonFolderName string
 		if err != nil {
-			return *currentVersion, err
+			return err
 		}
 		// is first entry a folder ?
 		if strings.HasPrefix(entries[0].Attr, "D") {
@@ -111,26 +75,28 @@ func (build Build) CheckBuild(currentVersion *version.Version) (version.Version,
 			}
 		*/
 
+		var unzipErr error
 		if commonFolderName != "" && build.Location.SuppressParentFolder {
-			unzipErr := sevenzip.Uncompress(localFile, os.TempDir())
+			unzipErr = sevenzip.Uncompress(downloadedFile, os.TempDir())
 			if unzipErr == nil {
 				sourceFolder := path.Join(os.TempDir(), commonFolderName)
 				err = files.MoveFolder(sourceFolder, build.Location.Folder)
 			}
 		} else {
-			err = sevenzip.Uncompress(localFile, build.Location.Folder)
+			unzipErr = sevenzip.Uncompress(downloadedFile, build.Location.Folder)
 		}
-		if err == nil {
-			os.Remove(localFile)
+		if unzipErr == nil {
+			os.Remove(downloadedFile)
+		} else {
+			os.Rename(downloadedFile, downloadedFile+ ".bad")
 		}
 	}
 
 	if build.PostInstallCmd != "" {
-		err = build.executePostBuildCommand(localFile)
+		err = build.ExecutePostBuildCommand(downloadedFile)
+		os.Remove(downloadedFile)
 		if err != nil {
-			return *currentVersion, err
-		} else {
-			os.Remove(localFile)
+			return err
 		}
 	}
 
@@ -153,7 +119,25 @@ func (build Build) CheckBuild(currentVersion *version.Version) (version.Version,
 		}
 	}
 
-	return newVersion, nil
+	return err
+}
+
+func (build Build) ExecutePostBuildCommand(localFile string) (err error) {
+	split := strings.Split(build.PostInstallCmd, " ")
+	var commandLine []string
+	for _, string := range split {
+		string = strings.Replace(string, "${ARTIFACT}", localFile, -1)
+		if build.Location.Folder != "" {
+			string = strings.Replace(string, "${LOCATION}", localFile, -1)
+		}
+		commandLine = append(commandLine, string)
+	}
+	var combinedOutputBytes []byte
+	combinedOutputBytes, err = exec.Command(commandLine[0], commandLine[1:]...).CombinedOutput()
+	if err != nil {
+		log.Println("Error occurred : ", strings.TrimSpace(string(combinedOutputBytes)), err)
+	}
+	return err
 }
 
 func LoadBuildsFromFile(fileName string) []Build {

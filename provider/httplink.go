@@ -2,6 +2,7 @@ package provider
 
 import (
 	"github.com/PuerkitoBio/goquery"
+	"github.com/mozvip/builds/builds"
 	"github.com/mozvip/builds/tools/files"
 	"github.com/mozvip/builds/version"
 	"log"
@@ -10,25 +11,43 @@ import (
 	"strings"
 )
 
-func HttpLink(provider Provider, currentVersion *version.Version) (remoteUrl string, buildVersion version.Version, err error) {
+type HttpLinkProvider struct {
+}
 
-	link := provider.Url
+func (HttpLinkProvider) Init() {
+}
 
-	if provider.VersionSelector != "" || provider.LinkSelector != "" {
-		link, buildVersion, _ = determineLinkAndVersion(provider.Url, provider.LinkSelector, provider.VersionSelector, provider.VersionRegExp)
+func (HttpLinkProvider) CanHandle(buildType string) bool {
+	return buildType == "httpLink"
+}
+
+func (HttpLinkProvider) NeedsInstallLocation() bool {
+	return true
+}
+
+func (HttpLinkProvider) DownloadBuild(build *builds.Build, currentVersion *version.Version) (version.Version, error) {
+
+	link := build.Provider.Url
+
+	var availableVersion version.Version
+	if build.Provider.VersionSelector != "" || build.Provider.LinkSelector != "" {
+		link, availableVersion, _ = determineLinkAndVersion(build.Provider.Url, build.Provider.LinkSelector, build.Provider.VersionSelector, build.Provider.VersionRegExp)
 	} else {
-		resp, err := http.Head(provider.Url)
+		resp, err := http.Head(build.Provider.Url)
 		if err == nil {
 			buildTime, _ := http.ParseTime(resp.Header.Get("Last-Modified"))
-			buildVersion = version.NewDateTimeVersion(buildTime)
+			availableVersion = version.NewDateTimeVersion(buildTime)
 		}
 	}
 
-	if !buildVersion.After(currentVersion) {
-		return "", buildVersion, nil
+	if !availableVersion.After(currentVersion) {
+		return availableVersion, nil
 	}
 
-	return link, buildVersion, err
+	log.Printf("Downloading %s for new build of %s at version %s\n", link, build.Name, availableVersion)
+	e := build.DownloadBuildFromURL(link)
+
+	return availableVersion, e
 }
 
 func determineLinkAndVersion(downloadUrl string, linkSelector string, versionSelector string, versionRegExp string) (link string, linkVersion version.Version, err error) {

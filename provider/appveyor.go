@@ -3,12 +3,16 @@ package provider
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/mozvip/builds/builds"
 	"github.com/mozvip/builds/version"
 	"io/ioutil"
 	"net/http"
 	"regexp"
 	"time"
 )
+
+type AppVeyorProvider struct {
+}
 
 type AppVeyorResult struct {
 	Build struct {
@@ -28,12 +32,23 @@ type AppVeyorArtifact struct {
 	Size uint32
 }
 
-func AppVeyor(build Provider, currentVersion *version.Version) (localFile string, buildVersion version.Version, err error) {
-	apiUrl := fmt.Sprintf("https://ci.appveyor.com/api/projects/%s/branch/%s", build.Name, build.Branch)
+func (AppVeyorProvider) Init() {
+}
+
+func (AppVeyorProvider) CanHandle(buildType string) bool {
+	return buildType == "appVeyor"
+}
+
+func (AppVeyorProvider) NeedsInstallLocation() bool {
+	return true
+}
+
+func (AppVeyorProvider) DownloadBuild(build *builds.Build, currentVersion *version.Version) (version.Version, error) {
+	apiUrl := fmt.Sprintf("https://ci.appveyor.com/api/projects/%s/branch/%s", build.Provider.Name, build.Provider.Branch)
 
 	resp, err := http.Get(apiUrl)
 	if err != nil {
-		return "", version.NewStringVersion(""), err
+		return version.NewStringVersion(""), err
 	}
 	defer resp.Body.Close()
 	bytes, err := ioutil.ReadAll(resp.Body)
@@ -42,8 +57,8 @@ func AppVeyor(build Provider, currentVersion *version.Version) (localFile string
 		json.Unmarshal(bytes, &result)
 		for _,job := range result.Build.Jobs {
 
-			if build.JobRegExp != "" {
-				matched, _ := regexp.MatchString(build.JobRegExp, job.Name)
+			if build.Provider.JobRegExp != "" {
+				matched, _ := regexp.MatchString(build.Provider.JobRegExp, job.Name)
 				if !matched {
 					// skip this job
 					break
@@ -60,8 +75,10 @@ func AppVeyor(build Provider, currentVersion *version.Version) (localFile string
 					var artifacts []AppVeyorArtifact
 					json.Unmarshal(bytes, &artifacts)
 					for _, artifact := range artifacts {
-						if artifact.Name == build.DeploymentName || artifact.FileName == build.DeploymentName {
-							return fmt.Sprintf("https://ci.appveyor.com/api/buildjobs/%s/artifacts/%s", job.JobId, artifact.FileName), version.NewDateTimeVersion(job.Finished), nil
+						if artifact.Name == build.Provider.DeploymentName || artifact.FileName == build.Provider.DeploymentName {
+							url := fmt.Sprintf("https://ci.appveyor.com/api/buildjobs/%s/artifacts/%s", job.JobId, artifact.FileName)
+							err = build.DownloadBuildFromURL(url)
+							return version.NewDateTimeVersion(job.Finished), err
 						}
 					}
 				}
@@ -69,6 +86,6 @@ func AppVeyor(build Provider, currentVersion *version.Version) (localFile string
 		}
 	}
 
-	return "", version.NewStringVersion(""), err
+	return version.NewStringVersion(""), err
 
 }
