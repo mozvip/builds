@@ -44,17 +44,16 @@ func (s ScoopProvider) NeedsInstallLocation() bool {
 
 func (s ScoopProvider) DownloadBuild(build *builds.Build, currentVersion *version.Version) (version.Version, error) {
 
-	var installedVersion, availableVersion version.Version
-
-	installedVersion = s.InstalledPackages[build.Provider.Name]
+	installedVersion, installed := s.InstalledPackages[build.Provider.Name]
 
 	commandOutput, err := exec.Command("scoop", "search", build.Provider.Name).CombinedOutput()
 	if err == nil {
-		availableVersion = scoopExtractVersion(build.Provider.Name, commandOutput)
+		availableVersion := scoopExtractVersion(build.Provider.Name, commandOutput)
 		if availableVersion.After(&installedVersion) {
-			commandOutput, err = exec.Command("scoop", "upgrade", build.Provider.Name).CombinedOutput()
-			if err == nil {
-				return availableVersion, err
+			if installed {
+				commandOutput, err = exec.Command("scoop", "update", build.Provider.Name).CombinedOutput()
+			} else {
+				commandOutput, err = exec.Command("scoop", "install", build.Provider.Name).CombinedOutput()
 			}
 		}
 	}
