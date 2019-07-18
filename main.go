@@ -6,6 +6,7 @@ import (
 	"github.com/mozvip/builds/builds"
 	"github.com/mozvip/builds/icons"
 	"github.com/mozvip/builds/provider"
+	"github.com/mozvip/builds/search"
 	"github.com/mozvip/builds/version"
 	"gopkg.in/toast.v1"
 	"io/ioutil"
@@ -23,9 +24,9 @@ type CheckResult struct {
 	Err error
 }
 
-func checkBuilds(builds []builds.Build, versions map[string]version.Version) (downloadCount uint) {
+var buildProviders []provider.BuildProvider
 
-	buildProviders := provider.Init()
+func checkBuilds(builds []builds.Build, versions map[string]version.Version) (downloadCount uint) {
 
 	var wg sync.WaitGroup
 	results := make(chan CheckResult, len(builds))
@@ -109,6 +110,8 @@ func main() {
 
 	flag.Parse()
 
+	buildProviders = provider.Init()
+
 	infos, err := ioutil.ReadDir(buildsDir)
 
 	var buildsToCheck []builds.Build
@@ -133,16 +136,16 @@ func main() {
 
 	if *action == "update" {
 		findIconsForBuilds(buildsToCheck)
-		downloadCount := checkBuilds(buildsToCheck, localVersions)
+		checkBuilds(buildsToCheck, localVersions)
+	} else if *action == "search" {
 
-		if downloadCount > 0 {
-			notification := toast.Notification{
-				AppID: "Builds",
-				Title: fmt.Sprintf("%d builds have been downloaded !", downloadCount),
-				Message: fmt.Sprintf("%d builds have been downloaded and installed successfully", downloadCount),
-			}
-			notification.Push()
+		var results []search.SearchResult
+
+		for _, provider := range buildProviders {
+			results = append(results, provider.Search(*pack)...)
 		}
-	}
 
+		log.Println(results)
+		
+	}
 }

@@ -2,12 +2,19 @@ package version
 
 import (
 	"fmt"
+	"golang.org/x/sys/windows/registry"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
+	"log"
 	"os"
 	"path"
 	"time"
 )
+
+type InstalledPackage struct {
+	DisplayName string
+	DisplayVersion string
+}
 
 type Version struct {
 	FloatVersion float32	`yaml:"floatVersion,omitempty"`
@@ -60,7 +67,49 @@ func getVersionsFile() string {
 	return versionsFile
 }
 
+func LoadVersionsFromRegistry() ([]InstalledPackage, error) {
+
+	var installedPackages []InstalledPackage
+
+	k, err := registry.OpenKey(registry.LOCAL_MACHINE,
+		`SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall`, registry.ENUMERATE_SUB_KEYS)
+	if err != nil {
+		return installedPackages, err
+	}
+	defer k.Close()
+
+	names, err := k.ReadSubKeyNames(-1)
+	if err == nil {
+		for _, packageName := range names {
+
+			p := InstalledPackage{}
+
+			packageKey, _ := registry.OpenKey(k, packageName, registry.QUERY_VALUE)
+			val, _, err := packageKey.GetStringValue("DisplayName")
+			if err == nil {
+				p.DisplayName = val
+			}
+			vals, _, err := packageKey.GetStringValue("DisplayVersion")
+			if err == nil {
+				p.DisplayVersion = vals
+			}
+
+			installedPackages = append(installedPackages, p)
+		}
+	}
+
+	return installedPackages, err
+}
+
 func LoadVersions() (map[string]Version, error) {
+
+	installedPackages, err := LoadVersionsFromRegistry()
+	if err != nil {
+		log.Println(err)
+	} else {
+		log.Println(installedPackages)
+	}
+
 	versions := make(map[string]Version)
 
 	versionsFile := getVersionsFile()

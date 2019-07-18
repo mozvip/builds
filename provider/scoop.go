@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/mozvip/builds/builds"
+	"github.com/mozvip/builds/search"
+	"github.com/mozvip/builds/tools/commands"
 	"github.com/mozvip/builds/version"
 	"log"
 	"os/exec"
@@ -16,6 +18,24 @@ type ScoopProvider struct {
 
 func (s ScoopProvider) CanHandle(buildType string) bool {
 	return buildType == "scoop"
+}
+
+func (s ScoopProvider) Search(packageName string) []search.SearchResult {
+
+	var results []search.SearchResult
+	output, err := commands.RunCommand(exec.Command("scoop", "search", packageName))
+	if err == nil {
+		re := regexp.MustCompile("\n\\s+(\\S+)\\s+\\(([^\\)]+)\\).*")
+		searchResults := re.FindAllStringSubmatch(string(output), -1)
+		for _, value := range searchResults {
+			if value[1] == packageName {
+				version := version.NewStringVersion(value[2])
+				results = append(results, search.New(value[1], version))
+			}
+		}
+	}
+
+	return results
 }
 
 func (s ScoopProvider) NeedsInstallLocation() bool {
@@ -42,9 +62,21 @@ func (s ScoopProvider) DownloadBuild(build *builds.Build, currentVersion *versio
 	return installedVersion, err
 }
 
+func (s *ScoopProvider) Update() {
+	output, _ := exec.Command("scoop", "update").CombinedOutput()
+	log.Println(string(output))
+}
+
 func (s *ScoopProvider) Init() {
-	// "iex (new-object net.webclient).downloadstring('https://get.scoop.sh')"
-	log.Println("Scoop install : TODO")
+	path, e := exec.LookPath("scoop")
+	if e == nil {
+		log.Printf("scoop located at %s\n", path)
+	} else {
+		// scoop was not found : install it
+		output, _ := exec.Command("powershell", "iex", "(new-object net.webclient).downloadstring('https://get.scoop.sh')").CombinedOutput()
+		log.Println(string(output))
+	}
+
 	// scoop bucket add main
 
 	command := exec.Command("scoop", "list")

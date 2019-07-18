@@ -3,6 +3,7 @@ package provider
 import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/mozvip/builds/builds"
+	"github.com/mozvip/builds/search"
 	"github.com/mozvip/builds/tools/files"
 	"github.com/mozvip/builds/version"
 	"log"
@@ -14,8 +15,17 @@ import (
 type HttpLinkProvider struct {
 }
 
+func (HttpLinkProvider) Update() {
+}
+
 func (HttpLinkProvider) Init() {
 }
+
+
+func (HttpLinkProvider) Search(packageName string) []search.SearchResult {
+	return []search.SearchResult{}
+}
+
 
 func (HttpLinkProvider) CanHandle(buildType string) bool {
 	return buildType == "httpLink"

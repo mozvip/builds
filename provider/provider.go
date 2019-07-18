@@ -2,6 +2,7 @@ package provider
 
 import (
 	"github.com/mozvip/builds/builds"
+	"github.com/mozvip/builds/search"
 	"github.com/mozvip/builds/version"
 	"log"
 )
@@ -17,11 +18,12 @@ func Init() []BuildProvider {
 	return enabledProviders
 }
 
-
 type BuildProvider interface {
 
 	Init()
+	Update()
 	CanHandle(buildType string) bool
+	Search(packageName string) []search.SearchResult
 	NeedsInstallLocation() bool
 	DownloadBuild(build *builds.Build, currentVersion *version.Version) (version.Version, error)
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/google/go-github/github"
 	"github.com/mozvip/builds/builds"
+	"github.com/mozvip/builds/search"
 	"github.com/mozvip/builds/version"
 	"regexp"
 	"strings"
@@ -14,12 +15,20 @@ type GitHubProvider struct {}
 func (GitHubProvider) Init() {
 }
 
+func (GitHubProvider) Update() {
+}
+
+
 func (GitHubProvider) CanHandle(buildType string) bool {
 	return buildType == "githubRelease"
 }
 
 func (GitHubProvider) NeedsInstallLocation() bool {
 	return true
+}
+
+func (GitHubProvider) Search(packageName string) []search.SearchResult {
+	return []search.SearchResult{}
 }
 
 func (GitHubProvider) DownloadBuild(build *builds.Build, currentVersion *version.Version) (version.Version, error) {

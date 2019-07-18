@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/mozvip/builds/builds"
+	"github.com/mozvip/builds/search"
 	"github.com/mozvip/builds/version"
 	"io/ioutil"
 	"net/http"
@@ -35,8 +36,15 @@ type AppVeyorArtifact struct {
 func (AppVeyorProvider) Init() {
 }
 
+func (AppVeyorProvider) Update() {
+}
+
 func (AppVeyorProvider) CanHandle(buildType string) bool {
 	return buildType == "appVeyor"
+}
+
+func (AppVeyorProvider) Search(packageName string) []search.SearchResult {
+	return []search.SearchResult{}
 }
 
 func (AppVeyorProvider) NeedsInstallLocation() bool {

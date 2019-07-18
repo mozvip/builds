@@ -3,6 +3,7 @@ package provider
 import (
 	"fmt"
 	"github.com/mozvip/builds/builds"
+	"github.com/mozvip/builds/search"
 	"github.com/mozvip/builds/version"
 	"log"
 	"os/exec"
@@ -15,8 +16,16 @@ func (ChocolateyProvider) Init() {
 	log.Println("ChocolateyProvider init : TODO")
 }
 
+func (ChocolateyProvider) Update() {
+	log.Println("ChocolateyProvider update : TODO")
+}
+
 func (ChocolateyProvider) CanHandle(buildType string) bool {
 	return buildType == "chocolatey"
+}
+
+func (ChocolateyProvider) Search(packageName string) []search.SearchResult {
+	return []search.SearchResult{}
 }
 
 func (ChocolateyProvider) NeedsInstallLocation() bool {

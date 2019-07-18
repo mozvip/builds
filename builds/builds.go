@@ -94,10 +94,10 @@ func (build Build) DownloadBuildFromURL(remoteURL string) error {
 
 	if build.PostInstallCmd != "" {
 		err = build.ExecutePostBuildCommand(downloadedFile)
-		os.Remove(downloadedFile)
 		if err != nil {
 			return err
 		}
+		os.Remove(downloadedFile)
 	}
 
 	if build.Location.AddToPath {
@@ -133,6 +133,7 @@ func (build Build) ExecutePostBuildCommand(localFile string) (err error) {
 		commandLine = append(commandLine, string)
 	}
 	var combinedOutputBytes []byte
+	log.Println("Executing", commandLine)
 	combinedOutputBytes, err = exec.Command(commandLine[0], commandLine[1:]...).CombinedOutput()
 	if err != nil {
 		log.Println("Error occurred : ", strings.TrimSpace(string(combinedOutputBytes)), err)
