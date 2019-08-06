@@ -41,7 +41,7 @@ type Location struct {
 	AddToPath            bool `yaml:"addToPath"`
 }
 
-func (build Build) DownloadBuildFromURL(remoteURL string) error {
+func DownloadBuildFromURL(build *Build, remoteURL string) error {
 	downloadedFile, err := files.DownloadFile(remoteURL, os.TempDir())
 	if err != nil {
 		return err

@@ -22,8 +22,8 @@ func (HttpLinkProvider) Init() {
 }
 
 
-func (HttpLinkProvider) Search(packageName string) []search.SearchResult {
-	return []search.SearchResult{}
+func (HttpLinkProvider) Search(packageName string) []search.Result {
+	return []search.Result{}
 }
 
 
@@ -35,15 +35,15 @@ func (HttpLinkProvider) NeedsInstallLocation() bool {
 	return true
 }
 
-func (HttpLinkProvider) DownloadBuild(build *builds.Build, currentVersion *version.Version) (version.Version, error) {
+func (HttpLinkProvider) DownloadBuild(providerData *builds.ProviderData, currentVersion *version.Version) search.Result {
 
-	link := build.Provider.Url
+	link := providerData.Url
 
 	var availableVersion version.Version
-	if build.Provider.VersionSelector != "" || build.Provider.LinkSelector != "" {
-		link, availableVersion, _ = determineLinkAndVersion(build.Provider.Url, build.Provider.LinkSelector, build.Provider.VersionSelector, build.Provider.VersionRegExp)
+	if providerData.VersionSelector != "" || providerData.LinkSelector != "" {
+		link, availableVersion, _ = determineLinkAndVersion(providerData.Url, providerData.LinkSelector, providerData.VersionSelector, providerData.VersionRegExp)
 	} else {
-		resp, err := http.Head(build.Provider.Url)
+		resp, err := http.Head(providerData.Url)
 		if err == nil {
 			buildTime, _ := http.ParseTime(resp.Header.Get("Last-Modified"))
 			availableVersion = version.NewDateTimeVersion(buildTime)
@@ -51,13 +51,10 @@ func (HttpLinkProvider) DownloadBuild(build *builds.Build, currentVersion *versi
 	}
 
 	if !availableVersion.After(currentVersion) {
-		return availableVersion, nil
+		return search.New(providerData.Name, availableVersion, "")
 	}
 
-	log.Printf("Downloading %s for new build of %s at version %s\n", link, build.Name, availableVersion)
-	e := build.DownloadBuildFromURL(link)
-
-	return availableVersion, e
+	return search.New(providerData.Name, availableVersion, link)
 }
 
 func determineLinkAndVersion(downloadUrl string, linkSelector string, versionSelector string, versionRegExp string) (link string, linkVersion version.Version, err error) {

@@ -1,3 +1,3 @@
 @ECHO OFF
-rsrc -manifest builds.exe.manifest -o builds.syso
-go build -o builds.exe
+rsrc -manifest awi.exe.manifest -o awi.syso
+go build -o awi.exe

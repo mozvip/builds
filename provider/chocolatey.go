@@ -24,45 +24,47 @@ func (ChocolateyProvider) CanHandle(buildType string) bool {
 	return buildType == "chocolatey"
 }
 
-func (ChocolateyProvider) Search(packageName string) []search.SearchResult {
-	return []search.SearchResult{}
+func (ChocolateyProvider) Search(packageName string) []search.Result {
+	return []search.Result{}
 }
 
 func (ChocolateyProvider) NeedsInstallLocation() bool {
 	return false
 }
 
-func (ChocolateyProvider) DownloadBuild(build *builds.Build, currentVersion *version.Version) (version.Version, error) {
+func (ChocolateyProvider) DownloadBuild(providerData *builds.ProviderData, currentVersion *version.Version) search.Result {
 
 	var installedVersion, availableVersion version.Version
 
 	// get installed version
-	commandOutput, err := exec.Command("chocolatey", "list", "--local-only", build.Name).CombinedOutput()
+	commandOutput, err := exec.Command("chocolatey", "list", "--local-only", providerData.Name).CombinedOutput()
 	if err == nil {
-		installedVersion = extractVersion(build.Provider.Name, commandOutput)
+		installedVersion = extractVersion(providerData.Name, commandOutput)
 	} else {
 		log.Println("Error invoking chocolatey", err)
 		log.Println(string(commandOutput))
+		return search.Error(err)
 	}
 
 	// get available version
-	commandOutput, err = exec.Command("chocolatey", "list", build.Name).CombinedOutput()
+	commandOutput, err = exec.Command("chocolatey", "list", providerData.Name).CombinedOutput()
 	if err == nil {
-		availableVersion = extractVersion(build.Provider.Name, commandOutput)
+		availableVersion = extractVersion(providerData.Name, commandOutput)
 	} else {
 		log.Println("Error invoking chocolatey", err)
 		log.Println(string(commandOutput))
+		return search.Error(err)
 	}
 
 	if availableVersion.After(&installedVersion) {
-		output, err := exec.Command("chocolatey", "upgrade", build.Name, "-y").CombinedOutput()
-		if err == nil {
-
+		output, err := exec.Command("chocolatey", "upgrade", providerData.Name, "-y").CombinedOutput()
+		if err != nil {
+			return search.Error(err)
 		}
 		fmt.Println(string(output))
 	}
 
-	return availableVersion, err
+	return search.Installed(availableVersion)
 }
 
 func extractVersion(packageName string, commandOutput []byte) version.Version {

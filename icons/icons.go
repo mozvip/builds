@@ -16,23 +16,21 @@ type BuildIcon struct {
 	LocalIconPath string
 }
 
-func getIconsFolder() string {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return ""
-	}
-
-	iconsFolder := path.Join(homeDir, ".builds", "icons")
-	return iconsFolder
+type IconManager struct {
+	IconFolder string
 }
 
-func getIconFileName(build builds.Build) string {
-	iconsFile := path.Join(getIconsFolder(), build.Name + ".png")
+func New(configDir string) IconManager {
+	return IconManager{IconFolder: path.Join(configDir, "icons")}
+}
+
+func (i IconManager) getIconFileName(build builds.Build) string {
+	iconsFile := path.Join(i.IconFolder, build.Name + ".png")
 	return iconsFile
 }
 
-func GetIconForBuild(build builds.Build) string {
-	iconsFile := getIconFileName(build)
+func (i IconManager)  GetIconForBuild(build builds.Build) string {
+	iconsFile := i.getIconFileName(build)
 	_, err := os.Stat(iconsFile)
 	if err != nil && os.IsNotExist(err) {
 		return ""
@@ -40,23 +38,23 @@ func GetIconForBuild(build builds.Build) string {
 	return iconsFile
 }
 
-func downloadIcon(imageUrl string, baseURL *url.URL, iconFile string) (err error) {
+func (i IconManager)  downloadIcon(imageUrl string, baseURL *url.URL, iconFile string) (err error) {
 	if !strings.HasPrefix(imageUrl, "http") {
 		imageUrl, err = files.MakeAbsoluteUrl(imageUrl, baseURL)
 		if err != nil {
 			return err
 		}
 	}
-	localFile, downloadErr := files.DownloadFile(imageUrl, getIconsFolder())
+	localFile, downloadErr := files.DownloadFile(imageUrl, i.IconFolder)
 	if downloadErr == nil && localFile != iconFile {
 		os.Rename(localFile, iconFile)
 	}
 	return downloadErr
 }
 
-func CheckIcon(build builds.Build) error {
+func (i IconManager) CheckIcon(build builds.Build) error {
 
-	iconFile := getIconFileName(build)
+	iconFile := i.getIconFileName(build)
 	_, err := os.Stat(iconFile)
 	if err == nil {
 		// icon is there
@@ -85,7 +83,7 @@ func CheckIcon(build builds.Build) error {
 			// TODO: TEST
 			return nil
 		}
-		downloadIcon(imageUrl, resp.Request.URL, iconFile)
+		i.downloadIcon(imageUrl, resp.Request.URL, iconFile)
 	} else if build.Provider.Type == "httpLink" {
 		requestUrl, err := url.Parse(build.Provider.Url)
 		if err != nil {
@@ -107,7 +105,7 @@ func CheckIcon(build builds.Build) error {
 		if selection.Size() > 0 {
 			val, exists := selection.First().Attr("href")
 			if exists {
-				downloadIcon(val, requestUrl, iconFile)
+				i.downloadIcon(val, requestUrl, iconFile)
 			}
 		} else {
 			// TODO

@@ -6,12 +6,16 @@ import (
 )
 
 func RunCommand(cmd *exec.Cmd) (string, error) {
-	var b bytes.Buffer
-	cmd.Stdout = &b
-	err := cmd.Run()
+	var bOut bytes.Buffer
+	var bErr bytes.Buffer
 
+	cmd.Stdout = &bOut
+	cmd.Stderr = &bErr
+
+	err := cmd.Run()
 	if err == nil {
-		return string(b.Bytes()), err
+		return string(bOut.Bytes()), err
+	} else {
+		return string(bErr.Bytes()), err
 	}
-	return "", err
 }

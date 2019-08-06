@@ -23,9 +23,9 @@ type BuildProvider interface {
 	Init()
 	Update()
 	CanHandle(buildType string) bool
-	Search(packageName string) []search.SearchResult
+	Search(packageName string) []search.Result
 	NeedsInstallLocation() bool
-	DownloadBuild(build *builds.Build, currentVersion *version.Version) (version.Version, error)
+	DownloadBuild(providerData *builds.ProviderData, currentVersion *version.Version) search.Result
 
 }
 
@@ -33,20 +33,23 @@ func CheckBuild(build *builds.Build, buildProviders []BuildProvider, currentVers
 
 	log.Printf("Checking for new build of %s, current version = %s", build.Name, currentVersion)
 
-	var err error
-	var newVersion version.Version
-
 	for _, prov := range buildProviders {
 		if prov.CanHandle(build.Provider.Type) {
 			if prov.NeedsInstallLocation() && build.Location.Folder == "" && build.PostInstallCmd == "" {
 				log.Printf("%s has not location or post install cmd set, skipping installation", build.Name)
 				return *currentVersion, nil
 			}
-			newVersion, err = prov.DownloadBuild(build, currentVersion)
-			break
+			result := prov.DownloadBuild(&build.Provider, currentVersion)
+			if result.Err == nil {
+				if result.RemoteURL != "" {
+					result.Err = builds.DownloadBuildFromURL(build, result.RemoteURL)
+				}
+			}
+
+			return result.Version, result.Err
 		}
 	}
 
-	return newVersion, err
+	return *currentVersion, nil
 }
 

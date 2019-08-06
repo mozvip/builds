@@ -2,7 +2,6 @@ package provider
 
 import (
 	"bytes"
-	"fmt"
 	"github.com/mozvip/builds/builds"
 	"github.com/mozvip/builds/search"
 	"github.com/mozvip/builds/tools/commands"
@@ -20,9 +19,9 @@ func (s ScoopProvider) CanHandle(buildType string) bool {
 	return buildType == "scoop"
 }
 
-func (s ScoopProvider) Search(packageName string) []search.SearchResult {
+func (s ScoopProvider) Search(packageName string) []search.Result {
 
-	var results []search.SearchResult
+	var results []search.Result
 	output, err := commands.RunCommand(exec.Command("scoop", "search", packageName))
 	if err == nil {
 		re := regexp.MustCompile("\n\\s+(\\S+)\\s+\\(([^\\)]+)\\).*")
@@ -30,7 +29,7 @@ func (s ScoopProvider) Search(packageName string) []search.SearchResult {
 		for _, value := range searchResults {
 			if value[1] == packageName {
 				version := version.NewStringVersion(value[2])
-				results = append(results, search.New(value[1], version))
+				results = append(results, search.New(value[1], version, ""))
 			}
 		}
 	}
@@ -42,23 +41,35 @@ func (s ScoopProvider) NeedsInstallLocation() bool {
 	return false
 }
 
-func (s ScoopProvider) DownloadBuild(build *builds.Build, currentVersion *version.Version) (version.Version, error) {
+func (s ScoopProvider) InstallPackage(packageName string) search.Result {
 
-	installedVersion, installed := s.InstalledPackages[build.Provider.Name]
+	installedVersion, installed := s.InstalledPackages[packageName]
 
-	commandOutput, err := exec.Command("scoop", "search", build.Provider.Name).CombinedOutput()
-	if err == nil {
-		availableVersion := scoopExtractVersion(build.Provider.Name, commandOutput)
+	results := s.Search(packageName)
+
+	if len(results) == 1 {
+		availableVersion := results[0].Version
 		if availableVersion.After(&installedVersion) {
+			var err error
 			if installed {
-				commandOutput, err = exec.Command("scoop", "update", build.Provider.Name).CombinedOutput()
+				_, err = exec.Command("scoop", "update", packageName).CombinedOutput()
 			} else {
-				commandOutput, err = exec.Command("scoop", "install", build.Provider.Name).CombinedOutput()
+				_, err = exec.Command("scoop", "install", packageName).CombinedOutput()
+			}
+			if err != nil {
+				return search.Error(err)
 			}
 		}
+		return search.Installed(availableVersion)
 	}
 
-	return installedVersion, err
+	return search.None()
+}
+
+func (s ScoopProvider) DownloadBuild(providerData *builds.ProviderData, currentVersion *version.Version) search.Result {
+
+	return s.InstallPackage(providerData.Name)
+
 }
 
 func (s *ScoopProvider) Update() {
@@ -91,15 +102,5 @@ func (s *ScoopProvider) Init() {
 		for _, value := range allApps {
 			s.InstalledPackages[value[1]] = version.NewStringVersion(value[2])
 		}
-	}
-}
-
-func scoopExtractVersion(packageName string, commandOutput []byte) version.Version {
-	re := regexp.MustCompile(fmt.Sprintf("\\s+%s\\s+\\(([\\w\\.]+)\\).*", packageName))
-	submatch := re.FindStringSubmatch(string(commandOutput))
-	if len(submatch) > 0 {
-		return version.NewStringVersion(submatch[1])
-	} else {
-		return version.NewStringVersion("")
 	}
 }

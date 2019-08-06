@@ -25,6 +25,7 @@ type CheckResult struct {
 }
 
 var buildProviders []provider.BuildProvider
+var iconManager icons.IconManager
 
 func checkBuilds(builds []builds.Build, versions map[string]version.Version) (downloadCount uint) {
 
@@ -53,7 +54,7 @@ func checkBuilds(builds []builds.Build, versions map[string]version.Version) (do
 					ActivationArguments: result.Build.Location.Folder,
 				}
 
-				localIconPath := icons.GetIconForBuild(result.Build)
+				localIconPath := iconManager.GetIconForBuild(result.Build)
 				if localIconPath != "" {
 					notification.Icon = localIconPath
 				}
@@ -63,7 +64,6 @@ func checkBuilds(builds []builds.Build, versions map[string]version.Version) (do
 				downloadCount ++
 			}
 		}
-
 	}
 
 	return downloadCount
@@ -77,8 +77,8 @@ func checkBuild(results chan CheckResult, buildProviders []provider.BuildProvide
 	results <- CheckResult{Build: build, CurrentVersion:currentVersion, AvailableVersion:newVersion, Err: err}
 }
 
-func quit(versions map[string]version.Version) {
-	err := version.SaveVersions(versions)
+func quit(configDir string, versions map[string]version.Version) {
+	err := version.SaveVersions(configDir, versions)
 	if err != nil {
 		log.Fatalln("Error saving versions", err)
 	}
@@ -88,31 +88,57 @@ func findIconsForBuilds(builds []builds.Build) {
 	var wg sync.WaitGroup
 	for _, build := range builds {
 		wg.Add(1)
-		icons.CheckIcon(build)
+		iconManager.CheckIcon(build)
 		wg.Done()
 	}
 	wg.Wait()
 }
 
+func bootstrap() (string, error) {
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	buildsDir := path.Join(homeDir, ".config", "awi")
+
+	os.MkdirAll(buildsDir, 766)
+
+	// TODO : install 7zip with the scoop provider
+	//sevenzip := builds.ProviderData{Name:"7zip"}
+	for _, provider := range buildProviders {
+		if provider.CanHandle("scoop") {
+			// provider.DownloadBuild(&sevenzip, nil)
+		}
+	}
+	
+
+	return buildsDir, nil
+}
+
 func main() {
 
-	localVersions, err := version.LoadVersions()
+	configDir, err := bootstrap()
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	localVersions, err := version.LoadVersions(configDir)
 	if err != nil {
 		log.Fatalln("Initialization failed", err)
 	}
-	defer quit(localVersions)
-
-	homeDir, err := os.UserHomeDir()
-	buildsDir := path.Join(homeDir, ".builds")
+	defer quit(configDir, localVersions)
 
 	var action = flag.String("mode", "update", "action to execute")
 	var pack = flag.String("package", "all", "package to execute action on")
 
 	flag.Parse()
 
+	iconManager = icons.New(configDir)
+
 	buildProviders = provider.Init()
 
-	infos, err := ioutil.ReadDir(buildsDir)
+	infos, err := ioutil.ReadDir(configDir)
 
 	var buildsToCheck []builds.Build
 	for _, value := range infos {
@@ -120,7 +146,7 @@ func main() {
 			break
 		}
 		if strings.HasSuffix(value.Name(), ".yaml") {
-			buildsFromFile := builds.LoadBuildsFromFile(path.Join(buildsDir, value.Name()))
+			buildsFromFile := builds.LoadBuildsFromFile(path.Join(configDir, value.Name()))
 			if *pack == "all" {
 				buildsToCheck = append(buildsToCheck, buildsFromFile...)
 			} else {
@@ -139,7 +165,7 @@ func main() {
 		checkBuilds(buildsToCheck, localVersions)
 	} else if *action == "search" {
 
-		var results []search.SearchResult
+		var results []search.Result
 
 		for _, provider := range buildProviders {
 			results = append(results, provider.Search(*pack)...)

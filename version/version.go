@@ -2,6 +2,7 @@ package version
 
 import (
 	"fmt"
+	"github.com/mozvip/scrapbd/parseutils"
 	"golang.org/x/sys/windows/registry"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
@@ -61,9 +62,8 @@ func NewFloatVersion(version float32) Version {
 	return v
 }
 
-func getVersionsFile() string {
-	homeDir, _ := os.UserHomeDir()
-	versionsFile := path.Join(homeDir, ".builds", "versions", "versions.yaml")
+func getVersionsFile(configDir string) string {
+	versionsFile := path.Join(configDir, "versions", "versions.yaml")
 	return versionsFile
 }
 
@@ -82,26 +82,38 @@ func LoadVersionsFromRegistry() ([]InstalledPackage, error) {
 	if err == nil {
 		for _, packageName := range names {
 
-			p := InstalledPackage{}
+			func() {
+				p := InstalledPackage{}
+				packageKey, _ := registry.OpenKey(k, packageName, registry.QUERY_VALUE)
+				defer packageKey.Close()
+				val, _, err := packageKey.GetStringValue("DisplayName")
+				if err == nil {
 
-			packageKey, _ := registry.OpenKey(k, packageName, registry.QUERY_VALUE)
-			val, _, err := packageKey.GetStringValue("DisplayName")
-			if err == nil {
-				p.DisplayName = val
-			}
-			vals, _, err := packageKey.GetStringValue("DisplayVersion")
-			if err == nil {
-				p.DisplayVersion = vals
-			}
+					submatch := parseutils.FindStringSubmatch(val, `(.*)\s+v?([\d\.]+)`)
+					if len(submatch) == 3 {
+						p.DisplayName = submatch[1]
+						p.DisplayVersion = submatch[2]
+					} else {
+						p.DisplayName = val
+					}
+				}
+				vals, _, err := packageKey.GetStringValue("DisplayVersion")
+				if err == nil {
+					p.DisplayVersion = vals
+				}
 
-			installedPackages = append(installedPackages, p)
+				if p.DisplayName != "" && p.DisplayVersion != "" {
+					installedPackages = append(installedPackages, p)
+				}
+
+			}()
 		}
 	}
 
 	return installedPackages, err
 }
 
-func LoadVersions() (map[string]Version, error) {
+func LoadVersions(configDir string) (map[string]Version, error) {
 
 	installedPackages, err := LoadVersionsFromRegistry()
 	if err != nil {
@@ -112,7 +124,7 @@ func LoadVersions() (map[string]Version, error) {
 
 	versions := make(map[string]Version)
 
-	versionsFile := getVersionsFile()
+	versionsFile := getVersionsFile(configDir)
 
 	_, e := os.Stat(versionsFile)
 	if e != nil && os.IsNotExist(e) {
@@ -132,10 +144,10 @@ func LoadVersions() (map[string]Version, error) {
 	return versions, nil
 }
 
-func SaveVersions(versions map[string]Version) error {
+func SaveVersions(configDir string, versions map[string]Version) error {
 	out, err := yaml.Marshal(versions)
 	if err == nil {
-		err = ioutil.WriteFile(getVersionsFile(), out, 0644)
+		err = ioutil.WriteFile(getVersionsFile(configDir), out, 0644)
 	}
 	return err
 }

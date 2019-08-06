@@ -43,20 +43,20 @@ func (AppVeyorProvider) CanHandle(buildType string) bool {
 	return buildType == "appVeyor"
 }
 
-func (AppVeyorProvider) Search(packageName string) []search.SearchResult {
-	return []search.SearchResult{}
+func (AppVeyorProvider) Search(packageName string) []search.Result {
+	return []search.Result{}
 }
 
 func (AppVeyorProvider) NeedsInstallLocation() bool {
 	return true
 }
 
-func (AppVeyorProvider) DownloadBuild(build *builds.Build, currentVersion *version.Version) (version.Version, error) {
-	apiUrl := fmt.Sprintf("https://ci.appveyor.com/api/projects/%s/branch/%s", build.Provider.Name, build.Provider.Branch)
+func (AppVeyorProvider) DownloadBuild(providerData *builds.ProviderData, currentVersion *version.Version) search.Result {
+	apiUrl := fmt.Sprintf("https://ci.appveyor.com/api/projects/%s/branch/%s", providerData.Name, providerData.Branch)
 
 	resp, err := http.Get(apiUrl)
 	if err != nil {
-		return version.NewStringVersion(""), err
+		return search.Error(err)
 	}
 	defer resp.Body.Close()
 	bytes, err := ioutil.ReadAll(resp.Body)
@@ -65,8 +65,8 @@ func (AppVeyorProvider) DownloadBuild(build *builds.Build, currentVersion *versi
 		json.Unmarshal(bytes, &result)
 		for _,job := range result.Build.Jobs {
 
-			if build.Provider.JobRegExp != "" {
-				matched, _ := regexp.MatchString(build.Provider.JobRegExp, job.Name)
+			if providerData.JobRegExp != "" {
+				matched, _ := regexp.MatchString(providerData.JobRegExp, job.Name)
 				if !matched {
 					// skip this job
 					break
@@ -78,22 +78,24 @@ func (AppVeyorProvider) DownloadBuild(build *builds.Build, currentVersion *versi
 				jobArtifactsUrl := fmt.Sprintf("https://ci.appveyor.com/api/buildjobs/%s/artifacts", job.JobId)
 				artifactResponse, errArtifacts := http.Get(jobArtifactsUrl)
 				if errArtifacts == nil {
-					defer artifactResponse.Body.Close()
-					bytes, _ := ioutil.ReadAll(artifactResponse.Body)
-					var artifacts []AppVeyorArtifact
-					json.Unmarshal(bytes, &artifacts)
-					for _, artifact := range artifacts {
-						if artifact.Name == build.Provider.DeploymentName || artifact.FileName == build.Provider.DeploymentName {
-							url := fmt.Sprintf("https://ci.appveyor.com/api/buildjobs/%s/artifacts/%s", job.JobId, artifact.FileName)
-							err = build.DownloadBuildFromURL(url)
-							return version.NewDateTimeVersion(job.Finished), err
+					return func() search.Result {
+						defer artifactResponse.Body.Close()
+						bytes, _ := ioutil.ReadAll(artifactResponse.Body)
+						var artifacts []AppVeyorArtifact
+						json.Unmarshal(bytes, &artifacts)
+						for _, artifact := range artifacts {
+							if artifact.Name == providerData.DeploymentName || artifact.FileName == providerData.DeploymentName {
+								url := fmt.Sprintf("https://ci.appveyor.com/api/buildjobs/%s/artifacts/%s", job.JobId, artifact.FileName)
+								return search.New(artifact.Name, version.NewDateTimeVersion(job.Finished), url)
+							}
 						}
-					}
+						return search.None()
+					}()
 				}
 			}
 		}
 	}
 
-	return version.NewStringVersion(""), err
+	return search.None()
 
 }
